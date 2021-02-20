@@ -1,4 +1,4 @@
-package skm
+package template
 
 import (
 	"fmt"
