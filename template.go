@@ -49,7 +49,7 @@ func NewTemplate(
 	staticURL string,
 ) *Template {
 	return &Template{
-		logg: logg,
+		logg:              logg,
 		templateDir:       templateDir,
 		baseURL:           baseURL,
 		staticURL:         staticURL,
@@ -130,23 +130,24 @@ func (t *Template) ErrorTemplate() *template.Template {
 }
 
 // Render loads the templates and executes them.
-func (t *Template) Render(writer *io.Writer, templates ...string) {
+func (t *Template) Render(writer *io.Writer, templates ...string) (*template.Template, error) {
+
+	// new template
 	tmpl := template.New("layout")
+	// set delimiters
 	tmpl.Delims(t.left, t.right)
+	// add template functions
 	tmpl.Funcs(template.FuncMap{
 		"baseurl":   t.BaseURL,
 		"staticurl": t.StaticURL,
 	})
 
+	// read layout template
 	templateString, err := t.readFile(t.layoutTemplate)
 	if err != nil {
-		log.Print(err)
-			ctx.Status(500)
-			template.Execute(ctx.Writer, nil)
-		} else {
-			template.Execute(ctx.Writer, nil)
-		}
-		return t.ErrorTemplate(), fmt.Errorf("Error reading template file: %s", t.layoutTemplate)
+		t.logg.Print(err)
+		return t.ErrorTemplate(),
+			fmt.Errorf("error reading template file: %s", t.layoutTemplate)
 	}
 
 	_, err = tmpl.Parse(templateString)
@@ -158,7 +159,8 @@ func (t *Template) Render(writer *io.Writer, templates ...string) {
 		tPath := t.getTemplatePath(item)
 		templateString, err := t.readFile(tPath)
 		if err != nil {
-			return t.ErrorTemplate(), fmt.Errorf("Error reading template file: %s", tPath)
+			return t.ErrorTemplate(),
+				fmt.Errorf("error reading template file: %s", tPath)
 		}
 		newTmpl := tmpl.New(item)
 		_, err = newTmpl.Parse(templateString)
