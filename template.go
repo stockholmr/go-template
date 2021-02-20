@@ -41,7 +41,7 @@ type Template struct {
 	templateExtension string
 }
 
-// New template factory
+// NewTemplate factory
 func NewTemplate(
 	logg *log.Logger,
 	templateDir string,
