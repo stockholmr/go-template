@@ -52,7 +52,7 @@ func (t *Template) AddFunc(key string, function interface{}) *Template {
 }
 
 func (t *Template) SetLayout(layoutTemplate string) *Template {
-	t.layoutTemplate = layoutTemplate
+	t.layoutTemplate = t.getPath(layoutTemplate)
 	return t
 }
 
