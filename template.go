@@ -20,9 +20,6 @@ type Template struct {
 	// Global data
 	data map[string]string
 
-	// Base template allways loaded first
-	layoutTemplate string
-
 	// Template extension
 	templateExtension string
 }
@@ -36,6 +33,7 @@ func New() *Template {
 		templateExtension: "html",
 	}
 
+	templateTemplate.template.Delims("{{", "}}")
 	templateTemplate.initErrorTemplate()
 
 	return &templateTemplate
@@ -51,9 +49,21 @@ func (t *Template) AddFunc(key string, function interface{}) *Template {
 	return t
 }
 
-func (t *Template) SetLayout(layoutTemplate string) *Template {
-	t.layoutTemplate = t.getPath(layoutTemplate)
-	return t
+func (t *Template) SetLayout(layoutTemplate string) error {
+	templateFile := t.getPath(layoutTemplate)
+
+	// load layout template
+	templateString, err := t.readFile(templateFile)
+	if err != nil {
+		return err
+	}
+
+	_, err = t.template.Parse(templateString)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (t *Template) SetTemplateFileExt(ext string) *Template {
@@ -117,17 +127,6 @@ func (t *Template) initErrorTemplate() {
 }
 
 func (t *Template) AddTemplates(templates ...string) error {
-	// load layout template
-	templateString, err := t.readFile(t.layoutTemplate)
-	if err != nil {
-		return err
-	}
-
-	_, err = t.template.Parse(templateString)
-	if err != nil {
-		return err
-	}
-
 	for _, item := range templates {
 		tPath := t.getPath(item)
 		templateString, err := t.readFile(tPath)
@@ -140,7 +139,6 @@ func (t *Template) AddTemplates(templates ...string) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
