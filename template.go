@@ -51,19 +51,8 @@ func (t *Template) AddFunc(key string, function interface{}) *Template {
 
 func (t *Template) SetLayout(layoutTemplate string) error {
 	templateFile := t.getPath(layoutTemplate)
-
-	// load layout template
-	templateString, err := t.readFile(templateFile)
-	if err != nil {
-		return err
-	}
-
-	_, err = t.template.Parse(templateString)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := t.template.ParseFiles(templateFile)
+	return err
 }
 
 func (t *Template) SetTemplateFileExt(ext string) *Template {
@@ -129,12 +118,7 @@ func (t *Template) initErrorTemplate() {
 func (t *Template) AddTemplates(templates ...string) error {
 	for _, item := range templates {
 		tPath := t.getPath(item)
-		templateString, err := t.readFile(tPath)
-		if err != nil {
-			return fmt.Errorf("error reading template file: %s", tPath)
-		}
-		newTmpl := t.template.New(item)
-		_, err = newTmpl.Parse(templateString)
+		_, err := t.template.ParseFiles(tPath)
 		if err != nil {
 			return err
 		}
