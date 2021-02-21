@@ -116,13 +116,15 @@ func (t *Template) initErrorTemplate() {
 }
 
 func (t *Template) AddTemplates(templates ...string) error {
-	for _, item := range templates {
-		tPath := t.getPath(item)
-		_, err := t.template.ParseFiles(tPath)
-		if err != nil {
-			return err
-		}
+	for i, item := range templates {
+		templates[i] = t.getPath(item)
 	}
+	tmpl, err := t.template.ParseFiles(templates...)
+	if err != nil {
+		return err
+	}
+
+	_ = tmpl
 	return nil
 }
 
