@@ -5,103 +5,76 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
-	"log"
 	"path"
-	"strings"
 )
 
-// Template Type
 type Template struct {
+	template *template.Template
 
-	// logging
-	logg *log.Logger
+	// Global template directory
+	templatePath string
 
-	// base directory to locate all template files.
-	templateDir string
+	// Global template functions
+	templateFunc template.FuncMap
 
-	// base url
-	baseURL string
+	// Global data
+	data map[string]string
 
-	// staticUrl for loading js,css & images
-	staticURL string
-
-	// variables for us in all template files
-	globalData map[string]string
-
-	// left delimter
-	left string
-
-	// right delimiter
-	right string
-
-	// base template load first
+	// Base template allways loaded first
 	layoutTemplate string
 
-	// template extsion for cleaner loading of files.
+	// Template extension
 	templateExtension string
 }
 
-// NewTemplate factory
-func NewTemplate(
-	logg *log.Logger,
-	templateDir string,
-	baseURL string,
-	staticURL string,
-) *Template {
-	return &Template{
-		logg:              logg,
-		templateDir:       templateDir,
-		baseURL:           baseURL,
-		staticURL:         staticURL,
-		left:              "{{",
-		right:             "}}",
-		templateExtension: "html",
-		globalData:        make(map[string]string),
+func New() *Template {
+	templateTemplate := Template{
+		template:          template.New("template"),
+		templatePath:      "templates",
+		templateFunc:      template.FuncMap{},
+		data:              make(map[string]string),
+		templateExtension: ".html",
 	}
-} // end New()
 
-// SetLayout template file
-func (t *Template) SetLayout(layoutTemplate string) {
-	t.layoutTemplate = t.getTemplatePath(layoutTemplate)
-} // end SetLayout()
+	templateTemplate.initErrorTemplate()
 
-// SetDelimiters change the left and right delimiters for all templates
-func (t *Template) SetDelimiters(left string, right string) {
-	t.left = left
-	t.right = right
-} //end SetDelimiters()
+	return &templateTemplate
+}
 
-// SetFileExtension to be appended to the filename to locate the template
-// files
-func (t *Template) SetFileExtension(ext string) {
+func (t *Template) SetTemplatePath(path string) *Template {
+	t.templatePath = path
+	return t
+}
+
+func (t *Template) AddFunc(key string, function interface{}) *Template {
+	t.templateFunc[key] = function
+	return t
+}
+
+func (t *Template) SetLayout(layoutTemplate string) *Template {
+	t.layoutTemplate = layoutTemplate
+	return t
+}
+
+func (t *Template) SetTemplateFileExt(ext string) *Template {
 	t.templateExtension = ext
-} // end SetFileExtension()
+	return t
+}
 
-// SetData set global data to be applied to all templates
-func (t *Template) SetData(key string, value string) {
-	t.globalData[key] = value
-} // end SetData()
+func (t *Template) SetDelimiters(left string, right string) *Template {
+	t.template.Delims(left, right)
+	return t
+}
 
-// StaticURL template function
-func (t *Template) StaticURL(uri string) string {
-	if strings.HasPrefix(uri, "/") {
-		return fmt.Sprintf("%s%s", t.staticURL, uri)
-	}
-	return fmt.Sprintf("%s/%s", t.staticURL, uri)
-} // end StaticURL()
+func (t *Template) Data(key string, value string) *Template {
+	t.data[key] = value
+	return t
+}
 
-// BaseURL template function
-func (t *Template) BaseURL(uri string) string {
-	if strings.HasPrefix(uri, "/") {
-		return fmt.Sprintf("%s%s", t.baseURL, uri)
-	}
-	return fmt.Sprintf("%s/%s", t.baseURL, uri)
-} // end BaseURL()
-
-func (t *Template) getTemplatePath(file string) string {
+func (t *Template) getPath(file string) string {
 	filename := fmt.Sprintf("%s.%s", file, t.templateExtension)
-	return path.Join(t.templateDir, filename)
-} // end getTemplatePath()
+	return path.Join(t.templatePath, filename)
+}
 
 func (t *Template) readFile(file string) (string, error) {
 	b, err := ioutil.ReadFile(file)
@@ -111,9 +84,24 @@ func (t *Template) readFile(file string) (string, error) {
 	return string(b), nil
 }
 
-// ErrorTemplate produces a error message template
-func (t *Template) ErrorTemplate() *template.Template {
-	tmpl, _ := template.New("error").Parse(`<html>
+func (t *Template) mergeData(data map[string]interface{}) map[string]interface{} {
+	dataMap := make(map[string]interface{})
+
+	// clone global data
+	for key, value := range t.data {
+		dataMap[key] = value
+	}
+
+	// add data to map
+	for key, value := range data {
+		dataMap[key] = value
+	}
+
+	return dataMap
+}
+
+func (t *Template) initErrorTemplate() {
+	t.template.New("error").Parse(`<html>
 	<head>
 		<title>{{ if .title }} {{ .title }} {{ else }} Server Error {{ end }}</title>
 		<style>
@@ -126,48 +114,42 @@ func (t *Template) ErrorTemplate() *template.Template {
 		<h1>{{ if .message }} {{ .message }} {{ else }} Server Error {{ end }}</h1>
 	</body>
 	</html>`)
-	return tmpl
 }
 
-// Render loads the templates and executes them.
-func (t *Template) Render(writer *io.Writer, templates ...string) (*template.Template, error) {
-
-	// new template
-	tmpl := template.New("layout")
-	// set delimiters
-	tmpl.Delims(t.left, t.right)
-	// add template functions
-	tmpl.Funcs(template.FuncMap{
-		"baseurl":   t.BaseURL,
-		"staticurl": t.StaticURL,
-	})
-
-	// read layout template
+func (t *Template) AddTemplates(templates ...string) error {
+	// load layout template
 	templateString, err := t.readFile(t.layoutTemplate)
 	if err != nil {
-		t.logg.Print(err)
-		return t.ErrorTemplate(),
-			fmt.Errorf("error reading template file: %s", t.layoutTemplate)
+		return err
 	}
 
-	_, err = tmpl.Parse(templateString)
+	_, err = t.template.Parse(templateString)
 	if err != nil {
-		return t.ErrorTemplate(), err
+		return err
 	}
 
 	for _, item := range templates {
-		tPath := t.getTemplatePath(item)
+		tPath := t.getPath(item)
 		templateString, err := t.readFile(tPath)
 		if err != nil {
-			return t.ErrorTemplate(),
-				fmt.Errorf("error reading template file: %s", tPath)
+			return fmt.Errorf("error reading template file: %s", tPath)
 		}
-		newTmpl := tmpl.New(item)
+		newTmpl := t.template.New(item)
 		_, err = newTmpl.Parse(templateString)
 		if err != nil {
-			return t.ErrorTemplate(), err
+			return err
 		}
 	}
 
-	return tmpl, nil
-} // end Template()
+	return nil
+}
+
+func (t *Template) Execute(wr io.Writer, data map[string]interface{}) error {
+	tempData := t.mergeData(data)
+	return t.template.ExecuteTemplate(wr, "template", tempData)
+}
+
+func (t *Template) ExecuteTemplate(wr io.Writer, template string, data map[string]interface{}) error {
+	tempData := t.mergeData(data)
+	return t.template.ExecuteTemplate(wr, template, tempData)
+}
