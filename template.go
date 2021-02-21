@@ -33,7 +33,7 @@ func New() *Template {
 		templatePath:      "templates",
 		templateFunc:      template.FuncMap{},
 		data:              make(map[string]string),
-		templateExtension: ".html",
+		templateExtension: "html",
 	}
 
 	templateTemplate.initErrorTemplate()
